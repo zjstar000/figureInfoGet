@@ -6,14 +6,14 @@ from pyquery import PyQuery as pq
 
 
 class ItemDetail(object):
-    __itemInfoDict = {}
+    __itemOtherDict = {}
 
     def __init__(self, url, headers=UrlHeaders.getHeader()):
         self.url = url
         print(self.url)
         self.headers = headers
         self.__getPqDoc()
-        self.__setItemInfo()
+        self.__setOtherInfo()
 
     def __getPqDoc(self):
         html = requests.get(self.url, headers=self.headers).text
@@ -21,67 +21,24 @@ class ItemDetail(object):
             file.write(html)
         self.doc = pq(html)
 
+    # 発売日及び値段、ポイント（取得しない）JANコード以外の情報をitemOtherDictに保存しとく
     def __setOtherInfo(self):
         key = []
         value = []
-        tbodyItems = self.doc('#tblItemInfo').items()
-        for tbodyItem in tbodyItems:
-            trs = tbodyItem.find('tr').items()
-            # メーカー
-            mkTds = trs.__next__().find('td').items()
-            mkTitleTd = mkTds.__next__()
-            mkHrefTd = mkTds.__next__()
-            mkContent = mkTds.__next__().text()
-            key.append("maker")
-            value.append(mkContent)
-
-            # スケール
-            scTds = trs.__next__().find('td').items()
-            scTitleTd = scTds.__next__()
-            scHrefTd = scTds.__next__()
-            scContent = scTds.__next__().text()
-            key.append("scale")
-            value.append(scContent)
-
-            # 素材
-            szTds = trs.__next__().find('td').items()
-            szTitleTd = szTds.__next__()
-            szHrefTd = szTds.__next__()
-            szContent = szTds.__next__().text()
-            key.append("material")
-            value.append(szContent)
-
-            # 原型制作
-            gkTds = trs.__next__().find('td').items()
-            gkTitleTd = gkTds.__next__()
-            gkHrefTd = gkTds.__next__()
-            gkContent = gkTds.__next__().text()
-            key.append("author")
-            value.append(gkContent)
-
-            # 原作
-            gsTds = trs.__next__().find('td').items()
-            gsTitleTd = gsTds.__next__()
-            gsHrefTd = gsTds.__next__()
-            gsContent = gsTds.__next__().text()
-            key.append("from")
-            value.append(gsContent)
-
-            # 発売予定日
-
-            # 参考価格
-
-            # 代引前払価格
-
-            # 通常価格
-
-            # 取得ポイント
-
-            # JANコード
-
-            # 商品コード
-
-            self.__itemInfoDict = dict(zip(key, value))
+        tbodyItem = self.doc('#tblItemInfo').items().__next__()
+        trs = tbodyItem.find('tr:not([id^="masterBody_"])').items()
+        for tr in trs:
+            if tr.find('td').size() == 3:
+                tds = tr.find('td').items()
+                titleTd = tds.__next__().text()
+                # とりあえず取るだけで使っていない
+                hrefTd = tds.__next__()
+                contentTd = tds.__next__().text()
+                key.append(str.strip(titleTd))
+                value.append(str.strip(contentTd))
+            else:
+                continue
+        self.__itemOtherDict = dict(zip(key, value))
 
     # Item名称
     def getItemName(self):
@@ -109,32 +66,59 @@ class ItemDetail(object):
 
     # メーカー
     def getMaker(self):
-        return self.itemInfoDict.get("maker")
+        return self.__itemOtherDict.get("メーカー")
 
     # スケール
+    def getScale(self):
+        return self.__itemOtherDict.get("スケール")
 
     # 素材
+    def getMaterial(self):
+        return self.__itemOtherDict.get("素材")
+
+    # シリーズ
+    def getSeries(self):
+        return self.__itemOtherDict.get("シリーズ")
 
     # 原型制作
+    def getAuthor(self):
+        return self.__itemOtherDict.get("原型制作")
 
     # 原作
+    def getFrom(self):
+        return self.__itemOtherDict.get("原作")
 
     # 発売予定日
+    def getSalesDate(self):
+        tr = self.doc('#masterBody_trSalesDate').items().__next__()
+        return tr.find('td:last-child').text()
 
     # 参考価格
+    def getStickerPrice(self):
+        tr = self.doc('#masterBody_trStickerPrice').items().__next__()
+        return tr.find('td:last-child').text()
 
-    # 代引前払価格
-
-    # 通常価格
-
-    # 取得ポイント
+    # 1999価格
+    def get1999Price(self):
+        tr = self.doc('#masterBody_trPrice').items().__next__()
+        return tr.find('td:last-child').text()
 
     # JANコード
+    def getJanCode(self):
+        tr = self.doc('#masterBody_trJanCode').items().__next__()
+        return tr.find('td:last-child').text()
 
     # 商品コード
+    def getShohinCd(self):
+        return self.__itemOtherDict.get("商品コード")
+
+    # 情報をDBに反映
+    def preserving(self):
+        # TODO 未実装
+        return
 
 
-url = "https://www.1999.co.jp/10647918"
+url = "https://www.1999.co.jp/10647856"
 item = ItemDetail(url)
 
 print("ItemName: {}".format(item.getItemName()))
@@ -142,3 +126,13 @@ print("Ranking?: {}".format(item.getRanking()))
 print("R18?: {}".format(item.getIsAdult()))
 print("New?: {}".format(item.getIsNew()))
 print("marker = {}".format(item.getMaker()))
+print("scale = {}".format(item.getScale()))
+print("material = {}".format(item.getMaterial()))
+print("serise = {}".format(item.getSeries()))
+print("author = {}".format(item.getAuthor()))
+print("from = {}".format(item.getFrom()))
+print("salesDate = {}".format(item.getSalesDate()))
+print("stickerPrice = {}".format(item.getStickerPrice()))
+print("1999Price = {}".format(item.get1999Price()))
+print("JANcode = {}".format(item.getJanCode()))
+print("shohinCd = {}".format(item.getShohinCd()))
