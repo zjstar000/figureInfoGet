@@ -1,7 +1,8 @@
 import requests
 import re
+import pymongo
+import datetime
 from urlHeaders import UrlHeaders
-
 from pyquery import PyQuery as pq
 
 
@@ -39,6 +40,42 @@ class ItemDetail(object):
             else:
                 continue
         self.__itemOtherDict = dict(zip(key, value))
+
+    # @param: str
+    # @return: パラメタのstrにある全ての数字が組み合わせる後のint
+    def __getIntFromStr(self, str):
+        patternNum = re.compile(r"\d")
+        resNum = patternNum.findall(str)
+        numStr = ""
+        for num in resNum:
+            numStr = numStr + num
+        return int(numStr)
+
+    # @param: str
+    # @return: パラメタのstrから日付の情報を洗いだし、datetimeタイプとして戻す
+    def __getDate(self, str):
+        patternYyyy = re.compile(r"(\d{1,4}年|\d{4}\/)")
+        patternMm = re.compile(r"(\d{1,2}月|\/\d{1,2}\/)")
+        patternDd = re.compile(r"(\d{1,2}日|/\d.[^/])")
+
+        resYear = patternYyyy.search(str)
+        if not resYear:
+            year = 9999
+        else:
+            year = self.__getIntFromStr(resYear.group(0))
+
+        resMonth = patternMm.search(str)
+        if not resMonth:
+            month = 1
+        else:
+            month = self.__getIntFromStr(resMonth.group(0))
+
+        resDay = patternDd.search(str)
+        if not resDay:
+            day = 1
+        else:
+            day = self.__getIntFromStr(resDay.group(0))
+        return datetime.datetime(year, month, day)
 
     # Item名称
     def getItemName(self):
@@ -88,10 +125,23 @@ class ItemDetail(object):
     def getFrom(self):
         return self.__itemOtherDict.get("原作")
 
-    # 発売予定日
+    # 発売日
     def getSalesDate(self):
+        salesDate = None
         tr = self.doc('#masterBody_trSalesDate').items().__next__()
-        return tr.find('td:last-child').text()
+        self.dateStr = tr.find('td:last-child').text()
+        if self.dateStr:
+            salesDate = self.__getDate(self.dateStr)
+        return salesDate
+
+    # 予定日
+    def getYoteiDate(self):
+        yykDate = None
+        if self.dateStr and "予約" in self.dateStr:
+            parttern = re.compile(r"(\d+|\d+/+\d+|\d+/\d+/\d+)予約")
+            yykDateStr = parttern.search(self.dateStr).group(0)
+            yykDate = self.__getDate(yykDateStr)
+        return yykDate
 
     # 参考価格
     def getStickerPrice(self):
@@ -114,8 +164,24 @@ class ItemDetail(object):
 
     # 情報をDBに反映
     def preserving(self):
-        # TODO 未実装
-        return
+        client = pymongo.MongoClient(host='localhost', port=27017)
+        db = client.item
+        collection = db.item
+        currentItem = {
+            'janCd': self.getJanCode(),
+            'itemName': self.getItemName(),
+            'ranking': self.getRanking(),
+            'r18': self.getRanking(),
+            'new': self.getIsNew(),
+            'marker': self.getMaker(),
+            'from': self.getFrom(),
+            'salesDate': self.getSalesDate(),
+            'yykDate': self.getYoteiDate(),
+            'stickerPrice': self.getStickerPrice(),
+            '1999Price': self.get1999Price(),
+            'shohinCd': self.getShohinCd(),
+        }
+        # TODO 20191014ここまで
 
 
 url = "https://www.1999.co.jp/10647856"
@@ -132,6 +198,7 @@ print("serise = {}".format(item.getSeries()))
 print("author = {}".format(item.getAuthor()))
 print("from = {}".format(item.getFrom()))
 print("salesDate = {}".format(item.getSalesDate()))
+print("yykDate = {}".format(item.getYoteiDate()))
 print("stickerPrice = {}".format(item.getStickerPrice()))
 print("1999Price = {}".format(item.get1999Price()))
 print("JANcode = {}".format(item.getJanCode()))
