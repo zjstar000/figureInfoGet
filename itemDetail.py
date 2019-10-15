@@ -43,7 +43,8 @@ class ItemDetail(object):
 
     # @param: str
     # @return: パラメタのstrにある全ての数字が組み合わせる後のint
-    def __getIntFromStr(self, str):
+    @staticmethod
+    def __getIntFromStr(str):
         patternNum = re.compile(r"\d")
         resNum = patternNum.findall(str)
         numStr = ""
@@ -76,6 +77,19 @@ class ItemDetail(object):
         else:
             day = self.__getIntFromStr(resDay.group(0))
         return datetime.datetime(year, month, day)
+
+    # @param: gene items' generator
+    # @return: price(int) of this item
+    @staticmethod
+    def __getPrice(priceStr):
+        price = 0
+        patternPrice = re.compile(r'[\d,]+[\d]')
+        m = patternPrice.findall(priceStr)
+        if len(m) > 0:
+            price = m[-1]
+            if ',' in price:
+                price = price.replace(",", "")
+        return int(price)
 
     # Item名称
     def getItemName(self):
@@ -167,39 +181,53 @@ class ItemDetail(object):
         client = pymongo.MongoClient(host='localhost', port=27017)
         db = client.item
         collection = db.item
+        # # 既存データ削除
+        # collection.delete_many({})
         currentItem = {
             'janCd': self.getJanCode(),
             'itemName': self.getItemName(),
             'ranking': self.getRanking(),
-            'r18': self.getRanking(),
+            'r18': self.getIsAdult(),
             'new': self.getIsNew(),
             'marker': self.getMaker(),
             'from': self.getFrom(),
             'salesDate': self.getSalesDate(),
             'yykDate': self.getYoteiDate(),
-            'stickerPrice': self.getStickerPrice(),
-            '1999Price': self.get1999Price(),
+            'stickerPrice': self.__getPrice(self.getStickerPrice()),
+            '1999Price': self.__getPrice(self.get1999Price()),
             'shohinCd': self.getShohinCd(),
+            'insertedDate': datetime.datetime.now(),
         }
-        # TODO 20191014ここまで
+
+        # データはすでに保存したかをチェックする
+        condition = {"shohinCd": self.getShohinCd()}
+        findResult = collection.find_one(condition)
+        if findResult:
+            currentItem['updatedDate'] = datetime.datetime.now()
+            currentItem.pop('insertedDate')
+            collection.update_one(condition, {'$set': currentItem})
+        else:
+            collection.insert_one(currentItem)
 
 
+# for debugging
 url = "https://www.1999.co.jp/10647856"
 item = ItemDetail(url)
-
-print("ItemName: {}".format(item.getItemName()))
-print("Ranking?: {}".format(item.getRanking()))
-print("R18?: {}".format(item.getIsAdult()))
-print("New?: {}".format(item.getIsNew()))
-print("marker = {}".format(item.getMaker()))
-print("scale = {}".format(item.getScale()))
-print("material = {}".format(item.getMaterial()))
-print("serise = {}".format(item.getSeries()))
-print("author = {}".format(item.getAuthor()))
-print("from = {}".format(item.getFrom()))
-print("salesDate = {}".format(item.getSalesDate()))
-print("yykDate = {}".format(item.getYoteiDate()))
-print("stickerPrice = {}".format(item.getStickerPrice()))
-print("1999Price = {}".format(item.get1999Price()))
-print("JANcode = {}".format(item.getJanCode()))
-print("shohinCd = {}".format(item.getShohinCd()))
+item.preserving()
+# for debugging
+# print("ItemName: {}".format(item.getItemName()))
+# print("Ranking?: {}".format(item.getRanking()))
+# print("R18?: {}".format(item.getIsAdult()))
+# print("New?: {}".format(item.getIsNew()))
+# print("marker = {}".format(item.getMaker()))
+# print("scale = {}".format(item.getScale()))
+# print("material = {}".format(item.getMaterial()))
+# print("serise = {}".format(item.getSeries()))
+# print("author = {}".format(item.getAuthor()))
+# print("from = {}".format(item.getFrom()))
+# print("salesDate = {}".format(item.getSalesDate()))
+# print("yykDate = {}".format(item.getYoteiDate()))
+# print("stickerPrice = {}".format(item.getStickerPrice()))
+# print("1999Price = {}".format(item.get1999Price()))
+# print("JANcode = {}".format(item.getJanCode()))
+# print("shohinCd = {}".format(item.getShohinCd()))
