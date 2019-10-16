@@ -1,26 +1,23 @@
-import requests
+
 import re
 import pymongo
 import datetime
-from urlHeaders import UrlHeaders
+
 from pyquery import PyQuery as pq
 
 
 class ItemDetail(object):
     __itemOtherDict = {}
 
-    def __init__(self, url, headers=UrlHeaders.getHeader()):
-        self.url = url
-        print(self.url)
-        self.headers = headers
+    def __init__(self, html):
+        self.html = html
         self.__getPqDoc()
         self.__setOtherInfo()
 
     def __getPqDoc(self):
-        html = requests.get(self.url, headers=self.headers).text
         with open("html.txt", "w") as file:
-            file.write(html)
-        self.doc = pq(html)
+            file.write(self.html)
+        self.doc = pq(self.html)
 
     # 発売日及び値段、ポイント（取得しない）JANコード以外の情報をitemOtherDictに保存しとく
     def __setOtherInfo(self):
@@ -142,10 +139,12 @@ class ItemDetail(object):
     # 発売日
     def getSalesDate(self):
         salesDate = None
-        tr = self.doc('#masterBody_trSalesDate').items().__next__()
-        self.dateStr = tr.find('td:last-child').text()
-        if self.dateStr:
-            salesDate = self.__getDate(self.dateStr)
+        self.dateStr = ""
+        if self.doc('#masterBody_trSalesDate').size() > 0:
+            tr = self.doc('#masterBody_trSalesDate').items().__next__()
+            self.dateStr = tr.find('td:last-child').text()
+            if self.dateStr:
+                salesDate = self.__getDate(self.dateStr)
         return salesDate
 
     # 予定日
@@ -159,18 +158,27 @@ class ItemDetail(object):
 
     # 参考価格
     def getStickerPrice(self):
-        tr = self.doc('#masterBody_trStickerPrice').items().__next__()
-        return tr.find('td:last-child').text()
+        stickerPrice = None
+        if self.doc('#masterBody_trStickerPrice').size() > 0:
+            tr = self.doc('#masterBody_trStickerPrice').items().__next__()
+            stickerPrice = tr.find('td:last-child').text()
+        return stickerPrice
 
     # 1999価格
     def get1999Price(self):
-        tr = self.doc('#masterBody_trPrice').items().__next__()
-        return tr.find('td:last-child').text()
+        e1999Price = None
+        if self.doc('#masterBody_trPrice').size() > 0:
+            tr = self.doc('#masterBody_trPrice').items().__next__()
+            e1999Price = tr.find('td:last-child').text()
+        return e1999Price
 
     # JANコード
     def getJanCode(self):
-        tr = self.doc('#masterBody_trJanCode').items().__next__()
-        return tr.find('td:last-child').text()
+        janCode = None
+        if self.doc('#masterBody_trJanCode').size() > 0:
+            tr = self.doc('#masterBody_trJanCode').items().__next__()
+            janCode = tr.find('td:last-child').text()
+        return janCode
 
     # 商品コード
     def getShohinCd(self):
@@ -196,24 +204,25 @@ class ItemDetail(object):
             'stickerPrice': self.__getPrice(self.getStickerPrice()),
             '1999Price': self.__getPrice(self.get1999Price()),
             'shohinCd': self.getShohinCd(),
-            'insertedDate': datetime.datetime.now(),
         }
 
         # データはすでに保存したかをチェックする
         condition = {"shohinCd": self.getShohinCd()}
         findResult = collection.find_one(condition)
         if findResult:
-            currentItem['updatedDate'] = datetime.datetime.now()
-            currentItem.pop('insertedDate')
+            changedFlg = collection.find_one(currentItem)
+            if not changedFlg:
+                currentItem['updatedDate'] = datetime.datetime.now()
             collection.update_one(condition, {'$set': currentItem})
         else:
+            currentItem['insertedDate'] = datetime.datetime.now()
             collection.insert_one(currentItem)
 
 
 # for debugging
-url = "https://www.1999.co.jp/10647856"
-item = ItemDetail(url)
-item.preserving()
+# url = "https://www.1999.co.jp"
+# item = ItemDetail(url)
+# item.preserving()
 # for debugging
 # print("ItemName: {}".format(item.getItemName()))
 # print("Ranking?: {}".format(item.getRanking()))
