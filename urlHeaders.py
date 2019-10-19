@@ -4,6 +4,7 @@ class UrlHeaders:
     def getHeader(self):
         # expires = Thu, 12 - Dec - 2019 10: 31:40 GMT
         return {
+            'Referer': 'https://www.1999.co.jp/',
             'User-Agent': 'Mozilla/5.0(Macintosh; Intel Mac OS X 10_11_4) AppleWebKit/537.36(KHTML, like Gecko) '
                           'Chrome/52.0.2743.116 Safari/537.36 ',
             'Cookie': 'MB=pc; LB=pc; RecUsr=1910022234279592; _ga=GA1.3.1126261753.1570023268; AC=1; '

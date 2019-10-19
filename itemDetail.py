@@ -1,13 +1,15 @@
-
 import re
 import pymongo
 import datetime
+from urlHeaders import UrlHeaders
+import requests
 
 from pyquery import PyQuery as pq
 
 
 class ItemDetail(object):
     __itemOtherDict = {}
+    __base_url = "https://www.1999.co.jp/"
 
     def __init__(self, html):
         self.html = html
@@ -54,7 +56,7 @@ class ItemDetail(object):
     def __getDate(self, str):
         patternYyyy = re.compile(r"(\d{1,4}年|\d{4}\/)")
         patternMm = re.compile(r"(\d{1,2}月|\/\d{1,2}\/)")
-        patternDd = re.compile(r"(\d{1,2}日|/\d.[^/])")
+        patternDd = re.compile(r"(\d{1,2}日|/\d{1,2}[^/\d])")
 
         resYear = patternYyyy.search(str)
         if not resYear:
@@ -184,8 +186,17 @@ class ItemDetail(object):
     def getShohinCd(self):
         return self.__itemOtherDict.get("商品コード")
 
+    # カテゴリ
+    def getCategory(self):
+        category = None
+        if self.doc('.item_genre').find('a').size() > 0:
+            item = self.doc('.item_genre').find('a').items().__next__()
+            category = item.attr("title")
+        return category
+
+
     # 情報をDBに反映
-    def preserving(self):
+    def preserving(self, imgPath=""):
         client = pymongo.MongoClient(host='localhost', port=27017)
         db = client.item
         collection = db.item
@@ -204,6 +215,8 @@ class ItemDetail(object):
             'stickerPrice': self.__getPrice(self.getStickerPrice()),
             '1999Price': self.__getPrice(self.get1999Price()),
             'shohinCd': self.getShohinCd(),
+            'imagePath': imgPath,
+            'category': self.getCategory(),
         }
 
         # データはすでに保存したかをチェックする
@@ -218,9 +231,8 @@ class ItemDetail(object):
             currentItem['insertedDate'] = datetime.datetime.now()
             collection.insert_one(currentItem)
 
-
 # for debugging
-# url = "https://www.1999.co.jp"
+# url = "https://www.1999.co.jp/10630979"
 # item = ItemDetail(url)
 # item.preserving()
 # for debugging
@@ -240,3 +252,4 @@ class ItemDetail(object):
 # print("1999Price = {}".format(item.get1999Price()))
 # print("JANcode = {}".format(item.getJanCode()))
 # print("shohinCd = {}".format(item.getShohinCd()))
+# print("shohinCd = {}".format(item.getCategory()))
